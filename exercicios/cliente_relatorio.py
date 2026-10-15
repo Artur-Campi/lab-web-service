@@ -1,4 +1,4 @@
-"""Exercício 1: Cliente integrador (consulta Flask e Node e funde os dados)."""
+# exercicio 1 - cliente integrador
 import requests
 
 URL_FLASK = "http://localhost:5000/detalhes/{}"
@@ -14,9 +14,9 @@ def buscar(url):
 
 
 def gerar_relatorio(produto_id):
-    fiscal = buscar(URL_FLASK.format(produto_id))   # {"id", "preco", "categoria"}
-    estoque = buscar(URL_NODE.format(produto_id))   # {"id", "nome", "estoque"}
-    return {**fiscal, **estoque}                    # fusão dos dois JSONs
+    fiscal = buscar(URL_FLASK.format(produto_id))
+    estoque = buscar(URL_NODE.format(produto_id))
+    return {**fiscal, **estoque}  # junta os dois json
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Exercício 4: envia o cadastro completo para o Node e confere o resultado nos dois servidores."""
+# exercicio 4 - cadastro pelo node
 import json
 
 import requests

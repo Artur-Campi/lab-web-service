@@ -1,4 +1,4 @@
-"""Exercício 3: monitoramento genérico (sem lógica específica por linguagem)."""
+# exercicio 3 - status dos dois servidores
 import requests
 
 

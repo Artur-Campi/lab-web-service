@@ -1,39 +1,30 @@
-"""
-Servidor Flask (porta 5000) - base de dados FISCAIS.
-
-Exercícios atendidos:
-  Ex. 2 -> GET  /detalhes/<id>        (consultado pelo Node como proxy)
-  Ex. 3 -> GET  /status               (contrato padronizado)
-  Ex. 4 -> POST /fiscal/cadastrar     (cálculo de 20% de imposto)
-  Ex. 5 -> validação de ID (400 INVALID_ID)
-"""
+# servidor flask - porta 5000 (parte fiscal)
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
-app.json.ensure_ascii = False  # mantém acentos legíveis no JSON
+app.json.ensure_ascii = False  # pra nao virar \u00e1 no json
 
-# Base de dados fiscais (preparação dos servidores)
+# base fiscal
 produtos_fiscais = {
     "1": {"preco": 2500.0, "categoria": "Laptops"},
     "2": {"preco": 1200.0, "categoria": "Monitores"},
 }
 
-# Ex. 4: produtos cadastrados via Node (persistência fiscal)
+# ex 4 - produtos que vem do node
 produtos_tecnicos = {}
 
 TAXA_IMPOSTO = 0.20
 
 
-# ---------------------------------------------------------------- utilitários
 def agora_iso():
-    """Data/hora UTC em ISO-8601 no mesmo formato do toISOString() do JS."""
+    # mesmo formato do toISOString() do js
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def id_valido(valor):
-    """Ex. 5: o ID deve ser um inteiro positivo (ex.: '1', '42')."""
+    # ex 5 - so aceita numero inteiro positivo
     texto = str(valor)
     return texto.isdigit() and int(texto) > 0
 
@@ -49,7 +40,6 @@ def buscar_produto(produto_id):
     return produtos_fiscais.get(produto_id) or produtos_tecnicos.get(produto_id)
 
 
-# ---------------------------------------------------------------------- rotas
 @app.route("/api/data", methods=["GET"])
 def get_data():
     return jsonify({"mensagem": "Olá do Flask!", "status": "sucesso", "tecnologia": "Python"})
@@ -60,7 +50,7 @@ def detalhes(produto_id):
     if not id_valido(produto_id):
         return erro_id_invalido()
 
-    produto_id = str(int(produto_id))  # normaliza "01" -> "1"
+    produto_id = str(int(produto_id))  # "01" vira "1"
     produto = buscar_produto(produto_id)
     if produto is None:
         return jsonify({"error": "NOT_FOUND", "message": f"Produto {produto_id} não encontrado"}), 404
@@ -100,7 +90,7 @@ def fiscal_cadastrar():
 
 @app.route("/fiscal/produtos", methods=["GET"])
 def listar_produtos_tecnicos():
-    """Rota auxiliar para conferir o dicionário produtos_tecnicos."""
+    # so pra conferir o dicionario no ex 4
     return jsonify(produtos_tecnicos)
 
 

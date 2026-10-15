@@ -1,12 +1,4 @@
-/*
- * Servidor Node.js/Express (porta 3000) - base de dados de ESTOQUE.
- *
- * Exercícios atendidos:
- *   Ex. 2 -> GET  /api/full-info/:id  (proxy: Node consulta o Flask)
- *   Ex. 3 -> GET  /status             (contrato padronizado)
- *   Ex. 4 -> POST /cadastrar          (distribui o cadastro para o Flask)
- *   Ex. 5 -> validação de ID (400 INVALID_ID)
- */
+// servidor node - porta 3000 (parte do estoque)
 const express = require('express');
 
 const app = express();
@@ -15,18 +7,17 @@ const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5000';
 
 app.use(express.json());
 
-// Base de estoque (preparação dos servidores)
+// base de estoque
 const produtos_estoque = {
   '1': { nome: 'Dell XPS 13', estoque: 10 },
   '2': { nome: 'Monitor LG 29', estoque: 5 },
 };
 
-// Ex. 4: produtos cadastrados pelo fluxo distribuído
+// ex 4
 const produtos_comerciais = {};
 
-// ------------------------------------------------------------- utilitários
 function idValido(valor) {
-  // Ex. 5: apenas dígitos e maior que zero
+  // ex 5 - so numero e maior que zero
   return /^\d+$/.test(String(valor)) && Number(valor) > 0;
 }
 
@@ -41,14 +32,13 @@ function buscarProduto(id) {
   return produtos_estoque[id] || produtos_comerciais[id];
 }
 
-// Middleware: valida qualquer parâmetro :id antes de processar a rota
+// valida o :id de todas as rotas antes de entrar nelas
 app.param('id', (req, res, next, id) => {
   if (!idValido(id)) return erroIdInvalido(res);
-  req.params.id = String(Number(id)); // normaliza "01" -> "1"
+  req.params.id = String(Number(id));
   next();
 });
 
-// ------------------------------------------------------------------- rotas
 app.get('/api/data', (req, res) => {
   res.json({ mensagem: 'Olá do Node.js!', status: 'sucesso', tecnologia: 'JavaScript' });
 });
@@ -61,7 +51,7 @@ app.get('/estoque/:id', (req, res) => {
   res.json({ id: req.params.id, ...produto });
 });
 
-// Ex. 2: o Node atua como CLIENTE do Flask
+// ex 2 - aqui o node chama o flask
 app.get('/api/full-info/:id', async (req, res) => {
   const { id } = req.params;
   const estoque = buscarProduto(id);
@@ -83,12 +73,12 @@ app.get('/api/full-info/:id', async (req, res) => {
   }
 });
 
-// Ex. 3: mesmo contrato do Flask
+// ex 3
 app.get('/status', (req, res) => {
   res.json({ service: 'node-estoque', status: 'online', timestamp: new Date().toISOString() });
 });
 
-// Ex. 4: cadastro com persistência distribuída
+// ex 4
 app.post('/cadastrar', async (req, res) => {
   const { id, nome, estoque, preco_base, categoria } = req.body || {};
 
@@ -100,12 +90,12 @@ app.post('/cadastrar', async (req, res) => {
     });
   }
 
-  // 1. Tratamento: nome em CAIXA ALTA
+  // nome em maiusculo
   const nomeTratado = nome.toUpperCase();
   const produtoId = String(Number(id));
 
   try {
-    // 2. Sincronização: envia apenas a parte fiscal para o Flask
+    // manda so a parte fiscal pro flask
     const resposta = await fetch(`${FLASK_URL}/fiscal/cadastrar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -118,7 +108,7 @@ app.post('/cadastrar', async (req, res) => {
       return res.status(resposta.status).json(fiscal);
     }
 
-    // 3. Persistência comercial (somente após o 201 do Flask)
+    // so salva aqui se o flask devolveu 201
     produtos_comerciais[produtoId] = { nome: nomeTratado, estoque };
     console.log(`[CADASTRO] Produto ${produtoId} salvo em produtos_comerciais:`, produtos_comerciais[produtoId]);
 
@@ -133,7 +123,7 @@ app.post('/cadastrar', async (req, res) => {
   }
 });
 
-// Rota auxiliar para conferir o dicionário produtos_comerciais
+// so pra conferir no ex 4
 app.get('/comerciais', (req, res) => res.json(produtos_comerciais));
 
 app.listen(PORT, () => {
