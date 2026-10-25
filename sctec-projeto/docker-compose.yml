@@ -2,16 +2,21 @@ services:
   servico-coordenador:
     build: ./servico-coordenador
     container_name: servico-coordenador
+    network_mode: bridge
     ports:
       - "3000:3000"
 
   servico-agendamento:
     build: ./servico-agendamento
     container_name: servico-agendamento
+    # no codespaces a rede que o compose cria fica bloqueada (iptables com FORWARD DROP),
+    # entao usei a rede bridge padrao do docker e o links pra achar o coordenador pelo nome
+    network_mode: bridge
+    links:
+      - servico-coordenador
     ports:
       - "5000:5000"
     environment:
-      # dentro da rede do compose o flask acha o node pelo nome do servico
       - COORDENADOR_URL=http://servico-coordenador:3000
       - USAR_LOCK=true
     depends_on:
