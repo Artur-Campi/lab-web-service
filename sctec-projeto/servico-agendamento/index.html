@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>SCTEC - Agendamento do Telescópio</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 980px; margin: 20px auto; padding: 0 12px; background: #f4f6f9; color: #222; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .caixa { background: #fff; border: 1px solid #d6dbe3; border-radius: 6px; padding: 14px 16px; margin: 14px 0; }
+  .caixa h2 { font-size: 16px; margin: 0 0 10px; }
+  .relogios { display: flex; gap: 24px; flex-wrap: wrap; font-family: monospace; font-size: 14px; }
+  .relogios b { display: block; font-family: Arial; font-size: 12px; color: #666; }
+  label { margin-right: 10px; font-size: 14px; }
+  input, select { padding: 4px; }
+  button { padding: 5px 12px; cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .4; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border-bottom: 1px solid #e2e6ec; padding: 6px; text-align: left; }
+  .CANCELADO { color: #b00; } .ATIVO { color: #070; }
+  #msg { font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>SCTEC - Telescópio Espacial Compartilhado</h1>
+<div>Cliente web (Entrega 4): sincroniza o relógio com o servidor e usa os links HATEOAS.</div>
+
+<div class="caixa">
+  <h2>1. Sincronização de relógio (algoritmo de Cristian)</h2>
+  <label>Simular relógio local errado:
+    <select id="desvio">
+      <option value="0">sem desvio</option>
+      <option value="2000" selected>+2 s (São Paulo adiantado)</option>
+      <option value="-1000">-1 s (Tóquio atrasado)</option>
+    </select>
+  </label>
+  <button onclick="sincronizar()">Sincronizar com GET /time</button>
+  <div class="relogios" style="margin-top:12px">
+    <div><b>Relógio local (com desvio)</b><span id="local">-</span></div>
+    <div><b>Relógio corrigido</b><span id="corrigido">-</span></div>
+    <div><b>Offset calculado</b><span id="offset">-</span></div>
+    <div><b>RTT</b><span id="rtt">-</span></div>
+  </div>
+</div>
+
+<div class="caixa">
+  <h2>2. Novo agendamento</h2>
+  <label>Cientista <select id="cientista"></select></label>
+  <label>Telescópio <select id="telescopio"></select></label>
+  <label>Início (UTC) <input id="inicio" value="2025-12-01T04:00:00Z" size="22"></label>
+  <button onclick="agendar()">Reservar</button>
+</div>
+
+<div class="caixa">
+  <h2>3. Agendamentos</h2>
+  <table>
+    <thead><tr><th>id</th><th>cientista</th><th>telescópio</th><th>início</th><th>status</th><th>ações (HATEOAS)</th></tr></thead>
+    <tbody id="lista"></tbody>
+  </table>
+</div>
+
+<div class="caixa"><h2>Última resposta do servidor</h2><div id="msg">-</div></div>
+
+<script>
+let offset = 0;  // diferenca entre o relogio do servidor e o local
+
+function agoraLocal() {  // relogio "errado" da maquina
+  return Date.now() + Number(document.getElementById('desvio').value);
+}
+function agoraCorrigido() {
+  return agoraLocal() + offset;
+}
+
+async function sincronizar() {
+  const t0 = agoraLocal();
+  const r = await fetch('/time');
+  const t1 = agoraLocal();
+  const dados = await r.json();
+  const rtt = t1 - t0;
+  // cristian: hora do servidor + metade do tempo de ida e volta
+  offset = (dados.epoch_ms + rtt / 2) - t1;
+  document.getElementById('offset').textContent = `${offset.toFixed(0)} ms`;
+  document.getElementById('rtt').textContent = `${rtt} ms`;
+  mostrar(dados);
+}
+
+setInterval(() => {
+  document.getElementById('local').textContent = new Date(agoraLocal()).toISOString();
+  document.getElementById('corrigido').textContent = new Date(agoraCorrigido()).toISOString();
+}, 100);
+
+function mostrar(obj) {
+  document.getElementById('msg').textContent = JSON.stringify(obj, null, 2);
+}
+
+async function carregarCombos() {
+  const cs = await (await fetch('/cientistas')).json();
+  const ts = await (await fetch('/telescopios')).json();
+  document.getElementById('cientista').innerHTML = cs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  document.getElementById('telescopio').innerHTML = ts.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+}
+
+async function carregarLista() {
+  const lista = await (await fetch('/agendamentos')).json();
+  document.getElementById('lista').innerHTML = lista.map(a => {
+    const cancelar = a._links.cancelar;  // o botao so existe se o servidor mandou o link
+    const botao = cancelar
+      ? `<button onclick="seguirLink('${cancelar.href}', '${cancelar.method}')">Cancelar</button>`
+      : `<button disabled>Cancelar</button>`;
+    return `<tr><td>${a.id}</td><td>${a.cientista}</td><td>${a.telescopio}</td><td>${a.horario_inicio_utc}</td>
+            <td class="${a.status}">${a.status}</td><td>${botao}</td></tr>`;
+  }).join('');
+}
+
+async function seguirLink(href, method) {
+  const r = await fetch(href, { method });
+  mostrar({ status: r.status, corpo: await r.json() });
+  carregarLista();
+}
+
+async function agendar() {
+  const corpo = {
+    cientista_id: Number(document.getElementById('cientista').value),
+    telescopio_id: Number(document.getElementById('telescopio').value),
+    horario_inicio_utc: document.getElementById('inicio').value,
+    timestamp_cliente_utc: new Date(agoraCorrigido()).toISOString(),  // hora ja corrigida
+  };
+  const r = await fetch('/agendamentos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+  });
+  mostrar({ status: r.status, enviado: corpo, corpo: await r.json() });
+  carregarLista();
+}
+
+carregarCombos().then(carregarLista).then(sincronizar);
+</script>
+</body>
+</html>
